@@ -3,199 +3,18 @@
  * Fully accessible: keyboard operable, ARIA live regions, focus management.
  */
 
-import { useState, useId } from 'react'
 import PropTypes from 'prop-types'
-import { CheckCircle2, Circle, Zap, TrendingDown, Award, ChevronDown, ChevronUp } from 'lucide-react'
-import { EFFORT_CONFIG, CATEGORY_CONFIG } from '../constants/emissions.js'
-import { trackEvent } from '../services/analytics.js'
+import { Zap, Award } from 'lucide-react'
+import ProgressRing from './ActionPlan/ProgressRing.jsx'
+import ActionCard from './ActionPlan/ActionCard.jsx'
+import FilterBar from './ActionPlan/FilterBar.jsx'
+import { useState } from 'react'
 
-// ─── Progress ring SVG ─────────────────────────────────────────────────────
-function ProgressRing({ pct, size = 80 }) {
-  const r    = (size / 2) - 6
-  const circ = 2 * Math.PI * r
-  const dash = (pct / 100) * circ
-
-  return (
-    <svg
-      width={size}
-      height={size}
-      aria-hidden="true"
-      className="rotate-[-90deg]"
-      focusable="false"
-    >
-      <circle cx={size/2} cy={size/2} r={r} fill="none" stroke="#dcfce7" strokeWidth={7} />
-      <circle
-        cx={size/2} cy={size/2} r={r}
-        fill="none"
-        stroke="#16a34a"
-        strokeWidth={7}
-        strokeDasharray={`${dash} ${circ}`}
-        strokeLinecap="round"
-        style={{ transition: 'stroke-dasharray 0.8s cubic-bezier(0.4,0,0.2,1)' }}
-      />
-    </svg>
-  )
-}
-ProgressRing.propTypes = { pct: PropTypes.number.isRequired, size: PropTypes.number }
-
-// ─── Single action card ────────────────────────────────────────────────────
-function ActionCard({ action, completed, onToggle }) {
-  const [expanded, setExpanded]   = useState(false)
-  const descId  = `action-desc-${action.id}`
-  const effort  = EFFORT_CONFIG[action.effort]  ?? EFFORT_CONFIG.low
-  const cat     = CATEGORY_CONFIG[action.category] ?? CATEGORY_CONFIG.lifestyle
-
-  return (
-    <article
-      aria-label={`${action.title} — ${completed ? 'completed' : 'not yet completed'}`}
-      className={`rounded-2xl border-2 transition-all duration-300 overflow-hidden
-        ${completed
-          ? 'border-eco-300 bg-eco-50/80'
-          : 'border-eco-100 bg-white hover:border-eco-200 hover:shadow-sm'
-        }`}
-    >
-      <div className="p-4">
-        <div className="flex items-start gap-3">
-          {/* Checkbox toggle */}
-          <button
-            onClick={() => onToggle(action.id)}
-            aria-pressed={completed}
-            aria-label={completed ? `Mark "${action.title}" as incomplete` : `Mark "${action.title}" as complete`}
-            className="mt-0.5 shrink-0 transition-all duration-200 hover:scale-110 active:scale-95
-              focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-eco-500 focus-visible:ring-offset-2 rounded-full"
-          >
-            {completed
-              ? <CheckCircle2 size={22} className="text-eco-500 fill-eco-100" aria-hidden="true" />
-              : <Circle       size={22} className="text-eco-300"             aria-hidden="true" />
-            }
-          </button>
-
-          {/* Content */}
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 flex-wrap mb-1">
-              <span aria-hidden="true" className="text-base">{action.icon}</span>
-              <span className={`text-sm font-bold ${completed ? 'line-through text-eco-400' : 'text-eco-900'}`}>
-                {action.title}
-              </span>
-            </div>
-
-            {/* Badges */}
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${cat.badgeClass}`}>
-                {cat.label}
-              </span>
-              <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${effort.badgeClass}`}>
-                {action.tag || effort.label}
-              </span>
-              <span className="text-xs font-bold text-eco-600 ml-auto tabular-nums" aria-label={`Reduces emissions by ${action.impact} tonnes CO2 per year`}>
-                <TrendingDown size={11} className="inline mr-0.5" aria-hidden="true" />
-                −{action.impact}t/yr
-              </span>
-            </div>
-
-            {/* Expandable description */}
-            <button
-              onClick={() => setExpanded((e) => !e)}
-              aria-expanded={expanded}
-              aria-controls={descId}
-              className="mt-2 text-xs text-eco-500 flex items-center gap-1
-                hover:text-eco-700 transition-colors
-                focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-eco-400 rounded"
-            >
-              {expanded
-                ? <><ChevronUp size={13} aria-hidden="true" /> Hide detail</>
-                : <><ChevronDown size={13} aria-hidden="true" /> Why this matters</>
-              }
-            </button>
-
-            <div id={descId} role="region" aria-label={`Details for ${action.title}`}>
-              {expanded && (
-                <div className="mt-2 space-y-2.5 animate-slide-up">
-                  <p className="text-xs text-eco-600 leading-relaxed">
-                    {action.description}
-                  </p>
-                  
-                  {/* Google Calendar Link */}
-                  <a
-                    href={`https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent('CarbonWise: ' + action.title)}&details=${encodeURIComponent(action.description + '\n\nImpact: Save ' + action.impact + 't CO2e/year')}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1.5 px-3 py-1 border border-eco-200 hover:border-eco-300 bg-eco-50 hover:bg-eco-100 rounded-lg text-[10px] font-bold text-eco-700 transition-colors focus-visible:ring-1 focus-visible:ring-eco-400"
-                    onClick={() => trackEvent('google_calendar_reminder_added', { action_id: action.id })}
-                  >
-                    📅 Schedule Weekly Google Calendar Reminder
-                  </a>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      </div>
-    </article>
-  )
-}
-ActionCard.propTypes = {
-  action: PropTypes.shape({
-    id:          PropTypes.string.isRequired,
-    category:    PropTypes.string.isRequired,
-    title:       PropTypes.string.isRequired,
-    description: PropTypes.string.isRequired,
-    impact:      PropTypes.number.isRequired,
-    effort:      PropTypes.string.isRequired,
-    icon:        PropTypes.string.isRequired,
-    tag:         PropTypes.string,
-  }).isRequired,
-  completed: PropTypes.bool.isRequired,
-  onToggle:  PropTypes.func.isRequired,
-}
-
-// ─── Filter tab bar ────────────────────────────────────────────────────────
-const FILTERS = [
-  { key: 'all',       label: 'All'       },
-  { key: 'transport', label: '🚗 Transport' },
-  { key: 'home',      label: '🏠 Home'     },
-  { key: 'lifestyle', label: '🥗 Lifestyle' },
-  { key: 'done',      label: '✅ Done'     },
-]
-
-function FilterBar({ active, onChange }) {
-  const uid = useId()
-  return (
-    <div
-      role="tablist"
-      aria-label="Filter eco-actions"
-      className="flex gap-1.5 overflow-x-auto pb-1"
-      style={{ scrollbarWidth: 'none' }}
-    >
-      {FILTERS.map((f) => (
-        <button
-          key={f.key}
-          role="tab"
-          id={`${uid}-tab-${f.key}`}
-          aria-selected={active === f.key}
-          onClick={() => onChange(f.key)}
-          className={`shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-200
-            focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-eco-500
-            ${active === f.key
-              ? 'bg-eco-600 text-white shadow'
-              : 'bg-eco-100 text-eco-600 hover:bg-eco-200'
-            }`}
-        >
-          {f.label}
-        </button>
-      ))}
-    </div>
-  )
-}
-FilterBar.propTypes = { active: PropTypes.string.isRequired, onChange: PropTypes.func.isRequired }
-
-// ─── Main component ────────────────────────────────────────────────────────
 export default function ActionPlan({ actions, completedActions, onToggle, projectedReduction, totalEmissions }) {
   const [filter, setFilter] = useState('all')
 
   const completedCount  = actions.filter((a) => completedActions.has(a.id)).length
-  const totalPossible   = actions.reduce((s, a) => s + a.impact, 0)
-  const progressPct     = totalPossible > 0 ? Math.min((projectedReduction / totalPossible) * 100, 100) : 0
+  const footprintReductionPct = totalEmissions > 0 ? Math.min((projectedReduction / totalEmissions) * 100, 100) : 0
   const newTotal        = Math.max(0, totalEmissions - projectedReduction)
 
   const filtered = (() => {
@@ -206,12 +25,23 @@ export default function ActionPlan({ actions, completedActions, onToggle, projec
     }
   })()
 
+  // Beautiful visual empty state with leaf/action board illustration
   if (actions.length === 0) {
     return (
-      <div className="text-center py-12 text-eco-400" role="status">
-        <span className="text-4xl mb-3 block" aria-hidden="true">🌱</span>
-        <p className="font-medium">Enter your data in the calculator tabs</p>
-        <p className="text-sm mt-1">Your personalised action plan will appear here</p>
+      <div className="glass-card rounded-2xl p-6 text-center shadow-sm space-y-4 max-w-md mx-auto animate-fade-in" role="status">
+        <div className="w-16 h-16 bg-eco-100 rounded-full flex items-center justify-center mx-auto mb-2">
+          <svg className="w-8 h-8 text-eco-600 animate-pulse" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+          </svg>
+        </div>
+        <h3 className="text-base font-bold text-eco-800">Ready to Take Action?</h3>
+        <p className="text-xs text-eco-500 leading-relaxed">
+          Your personalized eco-action plan is generated from your inputs.
+          Fill out the calculator tabs on the left (Commute, Home Energy, or Lifestyle) to see custom reduction recommendations here.
+        </p>
+        <div className="text-[10px] text-eco-400 italic">
+          Every checked action updates your projected carbon reduction in real time.
+        </div>
       </div>
     )
   }
@@ -227,17 +57,17 @@ export default function ActionPlan({ actions, completedActions, onToggle, projec
       <div className="glass-card rounded-2xl p-5 shadow-sm">
         <div className="flex items-center gap-4">
           <div className="relative shrink-0">
-            <ProgressRing pct={progressPct} />
+            <ProgressRing pct={footprintReductionPct} />
             <div
               className="absolute inset-0 flex items-center justify-center"
               aria-hidden="true"
             >
-              <span className="text-sm font-bold text-eco-700">{Math.round(progressPct)}%</span>
+              <span className="text-sm font-bold text-eco-700">{Math.round(footprintReductionPct)}%</span>
             </div>
           </div>
 
           <div className="flex-1">
-            <h3 className="font-bold text-eco-800 text-sm">Eco-Action Progress</h3>
+            <h3 className="font-bold text-eco-800 text-sm">Carbon Reduced</h3>
             <p className="text-xs text-eco-500 mt-0.5" aria-live="polite">
               {completedCount} of {actions.length} tasks completed
             </p>
@@ -301,8 +131,8 @@ export default function ActionPlan({ actions, completedActions, onToggle, projec
         <Zap size={16} className="inline text-eco-500 mr-1.5 mb-0.5" aria-hidden="true" />
         <span className="text-xs text-eco-600 font-medium">
           If 1 million people completed all actions, we would collectively save{' '}
-          <strong>{(totalPossible * 1_000_000).toLocaleString('en-IN')}t</strong>{' '}
-          CO2e — equivalent to planting ~{Math.round(totalPossible * 1_000_000 / 0.021).toLocaleString('en-IN')} trees.
+          <strong>{(actions.reduce((s, a) => s + a.impact, 0) * 1_000_000).toLocaleString('en-IN')}t</strong>{' '}
+          CO2e — equivalent to planting ~{Math.round(actions.reduce((s, a) => s + a.impact, 0) * 1_000_000 / 0.021).toLocaleString('en-IN')} trees.
         </span>
       </div>
     </div>

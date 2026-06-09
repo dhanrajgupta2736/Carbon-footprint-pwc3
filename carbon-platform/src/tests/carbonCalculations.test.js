@@ -79,6 +79,13 @@ describe('calcTransportEmissions', () => {
     expect(Number.isFinite(result)).toBe(true)
     expect(result).toBeGreaterThanOrEqual(0)
   })
+
+  it('handles invalid/missing inputs gracefully', () => {
+    expect(calcTransportEmissions(null)).toBe(0)
+    expect(calcTransportEmissions(undefined)).toBe(0)
+    expect(calcTransportEmissions({})).toBe(0)
+    expect(calcTransportEmissions({ dailyKm: 'invalid', vehicleType: 'petrol', flightsPerYear: 'abc', flightHours: 'def' })).toBe(0)
+  })
 })
 
 // ─── calcHomeEmissions ─────────────────────────────────────────────────────
@@ -117,6 +124,13 @@ describe('calcHomeEmissions', () => {
     expect(Number.isFinite(result)).toBe(true)
     expect(result).toBeGreaterThanOrEqual(0)
   })
+
+  it('handles invalid/missing inputs gracefully', () => {
+    expect(calcHomeEmissions(null)).toBe(0)
+    expect(calcHomeEmissions(undefined)).toBe(0)
+    expect(calcHomeEmissions({})).toBe(0)
+    expect(calcHomeEmissions({ monthlyKwh: 'invalid', heatingSource: 'electric', numPeople: 'xyz' })).toBe(0)
+  })
 })
 
 // ─── calcLifestyleEmissions ────────────────────────────────────────────────
@@ -151,6 +165,13 @@ describe('calcLifestyleEmissions', () => {
     expect(Number.isFinite(result)).toBe(true)
     expect(result).toBeGreaterThan(0)
   })
+
+  it('handles invalid/missing inputs gracefully', () => {
+    expect(calcLifestyleEmissions(null)).toBe(0)
+    expect(calcLifestyleEmissions(undefined)).toBe(0)
+    // fallback is omnivore (3.3) + some waste (0.56) = 3.86
+    expect(calcLifestyleEmissions({})).toBe(3.86)
+  })
 })
 
 // ─── calcTotalEmissions ────────────────────────────────────────────────────
@@ -168,6 +189,11 @@ describe('calcTotalEmissions', () => {
     const result = calcTotalEmissions(1.1111, 2.2222, 3.3333)
     const decimals = result.toString().split('.')[1]?.length ?? 0
     expect(decimals).toBeLessThanOrEqual(3)
+  })
+
+  it('handles invalid/missing inputs gracefully', () => {
+    expect(calcTotalEmissions(null, undefined, 'abc')).toBe(0)
+    expect(calcTotalEmissions('1.25', '2.50', '3.75')).toBe(7.5)
   })
 })
 
@@ -195,6 +221,11 @@ describe('getBreakdown', () => {
     const { transport, home, lifestyle } = getBreakdown(5, 1, 1)
     expect(transport).toBeGreaterThan(home)
     expect(transport).toBeGreaterThan(lifestyle)
+  })
+
+  it('handles invalid/missing inputs gracefully', () => {
+    expect(getBreakdown(null, undefined, 'abc')).toEqual({ transport: 0, home: 0, lifestyle: 0 })
+    expect(getBreakdown('1.0', '1.0', '1.0')).toEqual({ transport: 33.3, home: 33.3, lifestyle: 33.3 })
   })
 })
 
@@ -231,6 +262,13 @@ describe('compareToAverage', () => {
     expect(Number.isFinite(result.vsGlobal)).toBe(true)
     expect(Number.isFinite(result.vsIndia)).toBe(true)
     expect(Number.isFinite(result.vsTarget)).toBe(true)
+  })
+
+  it('handles invalid/missing inputs gracefully', () => {
+    const result = compareToAverage('abc')
+    expect(result.vsGlobal).toBeCloseTo(-100, 1)
+    expect(result.vsIndia).toBeCloseTo(-100, 1)
+    expect(result.vsTarget).toBe(-2.0)
   })
 })
 
@@ -312,6 +350,10 @@ describe('generateActionPlan', () => {
     const actions = generateActionPlan(baseTransport, solarHome, baseLifestyle, baseEmissions)
     expect(actions.some(a => a.id === 'solar')).toBe(false)
   })
+
+  it('handles invalid/missing inputs gracefully', () => {
+    expect(generateActionPlan(null, null, null, null)).toEqual([])
+  })
 })
 
 // ─── generateAssistantInsights ─────────────────────────────────────────────
@@ -352,5 +394,44 @@ describe('generateAssistantInsights', () => {
   it('returns more than one message for real data', () => {
     const msgs = generateAssistantInsights(2, 1, 3.86, defaults.t, defaults.h, defaults.l)
     expect(msgs.length).toBeGreaterThan(1)
+  })
+
+  it('handles invalid/missing inputs gracefully', () => {
+    const msgs = generateAssistantInsights(null, undefined, 'abc', null, null, null)
+    expect(msgs).toHaveLength(1)
+    expect(msgs[0].type).toBe('welcome')
+  })
+
+  // Multi-vertical correlation insights tests
+  it('returns alert for Double Carbon Driver correlation rule', () => {
+    const tData = { dailyKm: 35, vehicleType: 'petrol', flightsPerYear: 0, flightHours: 0 }
+    const hData = { monthlyKwh: 200, heatingSource: 'electric', numPeople: 2 }
+    const lData = { dietType: 'meatheavy', recyclingHabit: 'some' }
+    const msgs = generateAssistantInsights(2.5, 1.0, 4.5, tData, hData, lData)
+    expect(msgs.some(m => m.type === 'alert' && m.message.includes('Double Carbon Driver'))).toBe(true)
+  })
+
+  it('returns tip for Flying & Diet Offsetting correlation rule', () => {
+    const tData = { dailyKm: 10, vehicleType: 'hybrid', flightsPerYear: 4, flightHours: 3 }
+    const hData = { monthlyKwh: 100, heatingSource: 'electric', numPeople: 2 }
+    const lData = { dietType: 'meatheavy', recyclingHabit: 'some' }
+    const msgs = generateAssistantInsights(2.0, 0.5, 4.5, tData, hData, lData)
+    expect(msgs.some(m => m.type === 'tip' && m.message.includes('High Altitude & Agriculture'))).toBe(true)
+  })
+
+  it('returns positive for Climate Champion Status correlation rule', () => {
+    const tData = { dailyKm: 5, vehicleType: 'bikewalk', flightsPerYear: 0, flightHours: 0 }
+    const hData = { monthlyKwh: 100, heatingSource: 'electric', numPeople: 2 }
+    const lData = { dietType: 'vegan', recyclingHabit: 'all' }
+    const msgs = generateAssistantInsights(0.0, 0.5, 1.64, tData, hData, lData)
+    expect(msgs.some(m => m.type === 'positive' && m.message.includes('Eco-Champion Status'))).toBe(true)
+  })
+
+  it('returns tip for High Per-Capita Home Footprint correlation rule', () => {
+    const tData = { dailyKm: 10, vehicleType: 'electric', flightsPerYear: 0, flightHours: 0 }
+    const hData = { monthlyKwh: 400, heatingSource: 'electric', numPeople: 1 }
+    const lData = { dietType: 'omnivore', recyclingHabit: 'some' }
+    const msgs = generateAssistantInsights(0.2, 2.5, 3.86, tData, hData, lData)
+    expect(msgs.some(m => m.type === 'tip' && m.message.includes('High Per-Capita Energy'))).toBe(true)
   })
 })

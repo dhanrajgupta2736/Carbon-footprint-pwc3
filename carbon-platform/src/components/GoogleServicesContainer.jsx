@@ -7,7 +7,7 @@
 import { useState, useEffect, useRef } from 'react'
 import PropTypes from 'prop-types'
 import { Loader } from '@googlemaps/js-api-loader'
-import { MapPin, Globe, Compass, Film, ExternalLink, Star } from 'lucide-react'
+import { Globe, Compass, Film, ExternalLink, Star } from 'lucide-react'
 import { MAPS_API_KEY } from '../constants/emissions.js'
 import { trackEvent } from '../services/analytics.js'
 
@@ -23,7 +23,6 @@ export default function GoogleServicesContainer({ totalEmissions }) {
   const [activeTab, setActiveTab] = useState('map')
   const [places, setPlaces] = useState(MOCK_PLACES)
   const [selectedPlace, setSelectedPlace] = useState(null)
-  const [mapError, setMapError] = useState(false)
   const [isUsingMock, setIsUsingMock] = useState(!MAPS_API_KEY)
   const mapRef = useRef(null)
 
@@ -150,7 +149,6 @@ export default function GoogleServicesContainer({ totalEmissions }) {
       })
       .catch((err) => {
         console.error('Maps failed to load:', err)
-        setMapError(true)
         setIsUsingMock(true)
       })
   }, [activeTab])
@@ -243,7 +241,14 @@ export default function GoogleServicesContainer({ totalEmissions }) {
 
             {/* Sidebar / details pane */}
             <div className="w-full lg:w-72 flex flex-col gap-3">
-              <h4 className="font-bold text-xs text-eco-700 uppercase tracking-wider">Nearby Alternatives</h4>
+              <div>
+                <h4 className="font-bold text-xs text-eco-700 uppercase tracking-wider">Nearby Alternatives</h4>
+                {totalEmissions > 0 && (
+                  <p className="text-[10px] text-eco-500 mt-0.5">
+                    Your footprint: <strong className="text-eco-600">{totalEmissions}t CO2e</strong>. Find ways to reduce it below.
+                  </p>
+                )}
+              </div>
               <div className="flex-1 space-y-2 overflow-y-auto max-h-[180px] lg:max-h-[260px] pr-1">
                 {places.map((place) => (
                   <button
