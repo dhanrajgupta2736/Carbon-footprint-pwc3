@@ -28,6 +28,10 @@ export default function ProgressRing({ pct, size = 80 }) {
 }
 
 ProgressRing.propTypes = {
-  pct: PropTypes.number.isRequired,
+  pct:  PropTypes.number.isRequired,
   size: PropTypes.number,
+}
+
+ProgressRing.defaultProps = {
+  size: 80,
 }

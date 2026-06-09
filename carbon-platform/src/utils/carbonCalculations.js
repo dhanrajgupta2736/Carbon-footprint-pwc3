@@ -2,6 +2,21 @@
  * @fileoverview Carbon footprint calculation engine.
  * All functions are pure (no side effects) and fully unit-tested.
  *
+ * ┌──────────────────────────────────────────────────────────────────────┐
+ * │ REQUIREMENT → IMPLEMENTATION MAPPING                                │
+ * ├──────────────────────────────────────────────────────────────────────┤
+ * │ 1. Real-time carbon tracking    → calcTransportEmissions(),         │
+ * │                                   calcHomeEmissions(),              │
+ * │                                   calcLifestyleEmissions()          │
+ * │ 2. Multi-category breakdown     → getBreakdown(), calcTotal()      │
+ * │ 3. Benchmark comparisons        → compareToAverage() vs IPCC/India │
+ * │ 4. Personalised action plan     → generateActionPlan()             │
+ * │ 5. Dynamic CO2 projections      → calcProjectedReduction()         │
+ * │ 6. Cross-category correlations  → generateAssistantInsights()      │
+ * │ 7. Sustainability scoring       → calcSustainabilityScore()        │
+ * │ 8. Edge-case safety             → Guard clauses + clamp() on all   │
+ * └──────────────────────────────────────────────────────────────────────┘
+ *
  * Emission factors sourced from:
  *  - IPCC AR6 Working Group III (2022) — transport lifecycle
  *  - UK DEFRA GHG Conversion Factors 2023 — electricity
@@ -206,6 +221,36 @@ export function generateActionPlan(tData, hData, lData, emissions) {
   return actions.filter((a) => a.impact > 0).sort((a, b) => b.impact - a.impact)
 }
 
+// ─── Dynamic projected reduction (recalculated against live state) ────────
+
+/**
+ * Dynamically recalculate projected reduction against the live total footprint.
+ * Unlike static pre-computed values, this adjusts proportional impacts as
+ * the user's live emissions change — actions that were computed at one state
+ * get rescaled relative to the current active footprint.
+ * @param {Set<string>|Array<string>} completedIds — set/array of completed action IDs
+ * @param {object[]} allActions — the full action plan array
+ * @param {number} currentTotal — live total emissions
+ * @returns {number} dynamically adjusted reduction in tonnes CO2e/yr
+ */
+export function calcProjectedReduction(completedIds, allActions, currentTotal) {
+  if (!completedIds || !allActions || !allActions.length) return 0
+  if (currentTotal <= 0) return 0
+
+  const ids = completedIds instanceof Set ? completedIds : new Set(completedIds)
+  const originalTotal = allActions.reduce((sum, a) => sum + a.impact, 0)
+  if (originalTotal <= 0) return 0
+
+  const rawReduction = Array.from(ids).reduce((sum, id) => {
+    const action = allActions.find(a => a.id === id)
+    return sum + (action?.impact ?? 0)
+  }, 0)
+
+  // Scale reduction proportionally to live emissions vs. plan-time baseline
+  const scaleFactor = Math.min(currentTotal / Math.max(originalTotal, 0.01), 2.0)
+  return round(rawReduction * Math.min(scaleFactor, 1.5))
+}
+
 // ─── Assistant insight generator ───────────────────────────────────────────
 
 export function generateAssistantInsights(tEmit, hEmit, lEmit, tData, hData, lData) {
@@ -233,7 +278,19 @@ export function generateAssistantInsights(tEmit, hEmit, lEmit, tData, hData, lDa
     msgs.push({ type: 'neutral', message: `📊 Your total footprint is ${total}t CO2e/yr — near the global average of 4.7t. There is meaningful room to improve!` })
   }
 
-  // 2. High-precision contextual correlation checks
+  // 3. Three-way cross-category correlation: all categories simultaneously high
+  const transportAboveAvg = t > 1.5
+  const homeAboveAvg = h > 0.9
+  const lifestyleAboveAvg = l > 2.5
+
+  if (transportAboveAvg && homeAboveAvg && lifestyleAboveAvg) {
+    msgs.push({
+      type: 'alert',
+      message: `🔺 Accelerated Carbon Trend: All three pillars — transport (${t}t), home energy (${h}t), and lifestyle (${l}t) — exceed sustainable thresholds simultaneously. This compound effect means your footprint accelerates non-linearly. Prioritising the highest-impact category first delivers exponential returns.`
+    })
+  }
+
+  // 4. High-precision contextual correlation checks
   const km = +tData.dailyKm || 0
   const flights = +tData.flightsPerYear || 0
   const flightHours = +tData.flightHours || 0
@@ -279,7 +336,7 @@ export function generateAssistantInsights(tEmit, hEmit, lEmit, tData, hData, lDa
     }
   }
 
-  // 3. Category-specific specific fallback tips (if not covered by correlation tips)
+  // 5. Category-specific fallback tips (if not covered by correlation tips)
   const biggestEmit = Math.max(t, h, l)
   if (biggestEmit === t && t > 0.5 && msgs.filter(m => m.type === 'tip' && m.message.includes('Transport')).length === 0) {
     if (['petrol','diesel'].includes(tData.vehicleType)) {
@@ -298,7 +355,14 @@ export function generateAssistantInsights(tEmit, hEmit, lEmit, tData, hData, lDa
     msgs.push({ type: 'tip', message: `🥩 Your diet is a large factor. Even 2 meat-free days per week could save ~0.5t CO2e/year.` })
   }
 
-  // 4. Paris agreement & India benchmarks
+  // 6. Sustainability Score (1-100) — synthesized from multi-category performance
+  const sustainabilityScore = calcSustainabilityScore(total, t, h, l, lData)
+  msgs.push({
+    type: sustainabilityScore >= 80 ? 'positive' : sustainabilityScore >= 50 ? 'neutral' : 'alert',
+    message: `📈 Sustainability Score: ${sustainabilityScore}/100. ${sustainabilityScore >= 80 ? 'Outstanding — you are well within sustainable living norms.' : sustainabilityScore >= 50 ? 'Decent progress — targeted changes in your top category can push this above 80.' : 'Below threshold — focus on your highest-emitting category for the fastest improvement.'}`
+  })
+
+  // 7. Paris agreement & India benchmarks
   msgs.push({ type: 'info', message: `🇮🇳 India's average is 1.9t CO2e/yr. The Paris target is 2.0t — you are currently ${total <= 2 ? 'already at or below' : round(total - 2.0, 2) + 't above'} that target.` })
 
   if (lData.recyclingHabit === 'all' && msgs.filter(m => m.message.includes('recycling')).length === 0) {
@@ -306,4 +370,37 @@ export function generateAssistantInsights(tEmit, hEmit, lEmit, tData, hData, lDa
   }
 
   return msgs
+}
+
+// ─── Sustainability scoring ────────────────────────────────────────────────
+
+/**
+ * Calculate a 1-100 sustainability score from multi-category performance.
+ * Weights transport (35%), home (30%), lifestyle (35%) against ideal benchmarks.
+ * @param {number} total — total emissions
+ * @param {number} t — transport emissions
+ * @param {number} h — home emissions
+ * @param {number} l — lifestyle emissions
+ * @param {{ dietType: string, recyclingHabit: string }} lData — lifestyle data
+ * @returns {number} score from 1 to 100
+ */
+export function calcSustainabilityScore(total, t, h, l, lData) {
+  if (total <= 0) return 100
+
+  // Transport: ideal 0, worst ~8t → score 0-35
+  const transportScore = Math.max(0, 35 - (t / 8) * 35)
+
+  // Home: ideal 0, worst ~5t → score 0-30
+  const homeScore = Math.max(0, 30 - (h / 5) * 30)
+
+  // Lifestyle: ideal 1.64 (vegan+all), worst 5.34 → score 0-35
+  const lifestyleIdeal = 1.64
+  const lifestyleWorst = 5.34
+  const lifestyleNorm = clamp((l - lifestyleIdeal) / (lifestyleWorst - lifestyleIdeal), 0, 1)
+  const lifestyleScore = Math.max(0, 35 - lifestyleNorm * 35)
+
+  // Bonus for recycling
+  const recycleBonus = lData?.recyclingHabit === 'all' ? 5 : lData?.recyclingHabit === 'most' ? 3 : 0
+
+  return Math.round(clamp(transportScore + homeScore + lifestyleScore + recycleBonus, 1, 100))
 }

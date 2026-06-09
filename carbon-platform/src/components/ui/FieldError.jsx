@@ -13,5 +13,9 @@ export default function FieldError({ message, id }) {
 
 FieldError.propTypes = {
   message: PropTypes.string,
-  id: PropTypes.string.isRequired,
+  id:      PropTypes.string.isRequired,
+}
+
+FieldError.defaultProps = {
+  message: '',
 }

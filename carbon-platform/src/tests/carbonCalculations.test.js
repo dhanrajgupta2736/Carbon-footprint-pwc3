@@ -14,6 +14,8 @@ import {
   compareToAverage,
   generateActionPlan,
   generateAssistantInsights,
+  calcProjectedReduction,
+  calcSustainabilityScore,
 } from '../utils/carbonCalculations.js'
 
 // ─── calcTransportEmissions ────────────────────────────────────────────────
@@ -433,5 +435,143 @@ describe('generateAssistantInsights', () => {
     const lData = { dietType: 'omnivore', recyclingHabit: 'some' }
     const msgs = generateAssistantInsights(0.2, 2.5, 3.86, tData, hData, lData)
     expect(msgs.some(m => m.type === 'tip' && m.message.includes('High Per-Capita Energy'))).toBe(true)
+  })
+
+  it('includes sustainability score message in every non-empty response', () => {
+    const tData = { dailyKm: 10, vehicleType: 'petrol', flightsPerYear: 0, flightHours: 0 }
+    const hData = { monthlyKwh: 200, heatingSource: 'electric', numPeople: 2 }
+    const lData = { dietType: 'omnivore', recyclingHabit: 'some' }
+    const msgs = generateAssistantInsights(1.0, 0.5, 3.86, tData, hData, lData)
+    expect(msgs.some(m => m.message.includes('Sustainability Score'))).toBe(true)
+  })
+
+  it('includes Paris agreement benchmark in every non-empty response', () => {
+    const tData = { dailyKm: 5, vehicleType: 'electric', flightsPerYear: 0, flightHours: 0 }
+    const hData = { monthlyKwh: 100, heatingSource: 'solar', numPeople: 2 }
+    const lData = { dietType: 'vegan', recyclingHabit: 'all' }
+    const msgs = generateAssistantInsights(0.1, 0.2, 1.64, tData, hData, lData)
+    expect(msgs.some(m => m.message.includes('Paris'))).toBe(true)
+  })
+
+  it('returns Accelerated Carbon Trend when all categories are high', () => {
+    const tData = { dailyKm: 50, vehicleType: 'petrol', flightsPerYear: 0, flightHours: 0 }
+    const hData = { monthlyKwh: 500, heatingSource: 'gas', numPeople: 1 }
+    const lData = { dietType: 'meatheavy', recyclingHabit: 'none' }
+    const msgs = generateAssistantInsights(2.0, 1.5, 5.34, tData, hData, lData)
+    expect(msgs.some(m => m.message.includes('Accelerated Carbon Trend'))).toBe(true)
+  })
+})
+
+// ─── calcProjectedReduction ────────────────────────────────────────────────
+
+describe('calcProjectedReduction', () => {
+  const mockActions = [
+    { id: 'a', impact: 0.5 },
+    { id: 'b', impact: 1.0 },
+    { id: 'c', impact: 0.3 },
+  ]
+
+  it('returns 0 when completedIds is null', () => {
+    expect(calcProjectedReduction(null, mockActions, 5)).toBe(0)
+  })
+
+  it('returns 0 when allActions is empty', () => {
+    expect(calcProjectedReduction(new Set(['a']), [], 5)).toBe(0)
+  })
+
+  it('returns 0 when allActions is null', () => {
+    expect(calcProjectedReduction(new Set(['a']), null, 5)).toBe(0)
+  })
+
+  it('returns 0 when currentTotal is 0', () => {
+    expect(calcProjectedReduction(new Set(['a']), mockActions, 0)).toBe(0)
+  })
+
+  it('returns 0 when currentTotal is negative', () => {
+    expect(calcProjectedReduction(new Set(['a']), mockActions, -1)).toBe(0)
+  })
+
+  it('calculates reduction for a single completed action', () => {
+    const result = calcProjectedReduction(new Set(['a']), mockActions, 5)
+    expect(result).toBeGreaterThan(0)
+    expect(typeof result).toBe('number')
+  })
+
+  it('calculates reduction for multiple completed actions', () => {
+    const result = calcProjectedReduction(new Set(['a', 'b']), mockActions, 5)
+    expect(result).toBeGreaterThan(0)
+  })
+
+  it('accepts an Array instead of a Set for completedIds', () => {
+    const result = calcProjectedReduction(['a', 'b'], mockActions, 5)
+    expect(result).toBeGreaterThan(0)
+  })
+
+  it('ignores unknown action IDs gracefully', () => {
+    const result = calcProjectedReduction(new Set(['unknown']), mockActions, 5)
+    expect(result).toBe(0)
+  })
+
+  it('never exceeds a reasonable multiple of raw impacts', () => {
+    const result = calcProjectedReduction(new Set(['a', 'b', 'c']), mockActions, 100)
+    // raw total = 1.8, max scaleFactor capped at 1.5 => max = 2.7
+    expect(result).toBeLessThanOrEqual(2.7)
+  })
+})
+
+// ─── calcSustainabilityScore ───────────────────────────────────────────────
+
+describe('calcSustainabilityScore', () => {
+  it('returns 100 when total is 0', () => {
+    expect(calcSustainabilityScore(0, 0, 0, 0, { recyclingHabit: 'none' })).toBe(100)
+  })
+
+  it('returns 100 when total is negative', () => {
+    expect(calcSustainabilityScore(-1, 0, 0, 0, { recyclingHabit: 'none' })).toBe(100)
+  })
+
+  it('returns a score between 1 and 100 for typical inputs', () => {
+    const score = calcSustainabilityScore(5, 2, 1, 2, { dietType: 'omnivore', recyclingHabit: 'some' })
+    expect(score).toBeGreaterThanOrEqual(1)
+    expect(score).toBeLessThanOrEqual(100)
+  })
+
+  it('gives higher score for lower emissions', () => {
+    const low  = calcSustainabilityScore(2, 0.5, 0.3, 1.2, { recyclingHabit: 'most' })
+    const high = calcSustainabilityScore(10, 4, 3, 3, { recyclingHabit: 'none' })
+    expect(low).toBeGreaterThan(high)
+  })
+
+  it('adds bonus for recycling habit "all"', () => {
+    const withAll  = calcSustainabilityScore(3, 1, 1, 1, { recyclingHabit: 'all' })
+    const withNone = calcSustainabilityScore(3, 1, 1, 1, { recyclingHabit: 'none' })
+    expect(withAll).toBeGreaterThan(withNone)
+  })
+
+  it('adds bonus for recycling habit "most"', () => {
+    const withMost = calcSustainabilityScore(3, 1, 1, 1, { recyclingHabit: 'most' })
+    const withNone = calcSustainabilityScore(3, 1, 1, 1, { recyclingHabit: 'none' })
+    expect(withMost).toBeGreaterThan(withNone)
+  })
+
+  it('returns integer score', () => {
+    const score = calcSustainabilityScore(4, 1.5, 0.8, 1.7, { recyclingHabit: 'some' })
+    expect(Number.isInteger(score)).toBe(true)
+  })
+
+  it('handles null lData gracefully', () => {
+    const score = calcSustainabilityScore(3, 1, 1, 1, null)
+    expect(score).toBeGreaterThanOrEqual(1)
+    expect(score).toBeLessThanOrEqual(100)
+  })
+
+  it('handles very high emissions (extreme case)', () => {
+    const score = calcSustainabilityScore(50, 20, 15, 15, { recyclingHabit: 'none' })
+    expect(score).toBe(1)
+  })
+
+  it('gives perfect or near-perfect score for ideal lifestyle', () => {
+    const score = calcSustainabilityScore(1.64, 0, 0, 1.64, { recyclingHabit: 'all' })
+    expect(score).toBeGreaterThanOrEqual(90)
   })
 })

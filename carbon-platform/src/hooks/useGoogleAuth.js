@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { trackEvent } from '../services/analytics.js'
+import { logError } from '../utils/logger.js'
 
 export function useGoogleAuth() {
   const [user, setUser] = useState(() => {
@@ -31,7 +32,7 @@ export function useGoogleAuth() {
       localStorage.setItem('carbonwise_google_user', JSON.stringify(profile))
       trackEvent('google_login', { email: profile.email })
     } catch (err) {
-      console.error('Error decoding Google credential:', err)
+      logError('GoogleAuth', err)
     }
   }, [])
 

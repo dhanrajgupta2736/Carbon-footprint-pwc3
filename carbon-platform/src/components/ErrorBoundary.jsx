@@ -6,6 +6,7 @@
 import { Component } from 'react'
 import PropTypes from 'prop-types'
 import { RefreshCw, AlertTriangle } from 'lucide-react'
+import { logError } from '../utils/logger.js'
 
 export class ErrorBoundary extends Component {
   constructor(props) {
@@ -18,8 +19,7 @@ export class ErrorBoundary extends Component {
   }
 
   componentDidCatch(error, info) {
-    // In production this would send to an error tracking service (e.g. Google Cloud Error Reporting)
-    console.error('[CarbonWise ErrorBoundary]', error, info.componentStack)
+    logError('ErrorBoundary', error, info.componentStack)
   }
 
   handleReset = () => {

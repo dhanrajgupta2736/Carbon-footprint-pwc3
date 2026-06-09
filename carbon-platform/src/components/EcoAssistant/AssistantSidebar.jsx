@@ -64,6 +64,11 @@ export default function AssistantSidebar({ messages, totalEmissions }) {
 }
 
 AssistantSidebar.propTypes = {
-  messages:       PropTypes.array.isRequired,
+  messages: PropTypes.arrayOf(
+    PropTypes.shape({
+      type:    PropTypes.string.isRequired,
+      message: PropTypes.string.isRequired,
+    })
+  ).isRequired,
   totalEmissions: PropTypes.number.isRequired,
 }

@@ -9,10 +9,13 @@ import { Zap, Users } from 'lucide-react'
 import { HEATING_OPTIONS } from '../constants/emissions.js'
 import NumberField from './ui/NumberField.jsx'
 
+/** Approximate electricity cost per kWh in Indian Rupees (₹) */
+const COST_PER_KWH_INR = 8
+
 export default function HomeCalculator({ data, onChange, emissions }) {
   const uid  = useId()
   const kwh  = +data.monthlyKwh || 0
-  const cost = (kwh * 8).toFixed(0) // ≈ ₹8/kWh
+  const cost = (kwh * COST_PER_KWH_INR).toFixed(0)
 
   return (
     <section aria-label="Home energy emissions calculator" className="space-y-6 animate-slide-up">

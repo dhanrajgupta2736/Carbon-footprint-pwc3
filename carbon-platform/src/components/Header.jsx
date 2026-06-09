@@ -1,3 +1,8 @@
+/**
+ * @fileoverview Site header with branding, Google Sign-In, and navigation.
+ * Sticky header with blur effect and conditional reset button.
+ */
+
 import PropTypes from 'prop-types'
 import { Leaf, RotateCcw } from 'lucide-react'
 
@@ -90,10 +95,14 @@ Header.propTypes = {
   hasData: PropTypes.bool.isRequired,
   onReset: PropTypes.func.isRequired,
   user: PropTypes.shape({
-    name: PropTypes.string,
-    picture: PropTypes.string,
-    email: PropTypes.string,
+    name:    PropTypes.string.isRequired,
+    picture: PropTypes.string.isRequired,
+    email:   PropTypes.string,
   }),
-  onLogin: PropTypes.func.isRequired,
+  onLogin:  PropTypes.func.isRequired,
   onLogout: PropTypes.func.isRequired,
+}
+
+Header.defaultProps = {
+  user: null,
 }

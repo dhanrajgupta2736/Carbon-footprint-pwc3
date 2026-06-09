@@ -11,6 +11,14 @@ export default function ChartTooltip({ active, payload }) {
 }
 
 ChartTooltip.propTypes = {
-  active: PropTypes.bool,
-  payload: PropTypes.array,
+  active:  PropTypes.bool,
+  payload: PropTypes.arrayOf(PropTypes.shape({
+    name:  PropTypes.string,
+    value: PropTypes.number,
+  })),
+}
+
+ChartTooltip.defaultProps = {
+  active:  false,
+  payload: [],
 }

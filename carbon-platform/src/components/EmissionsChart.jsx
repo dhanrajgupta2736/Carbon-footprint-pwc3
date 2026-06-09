@@ -57,6 +57,14 @@ EmissionsChart.propTypes = {
   home:       PropTypes.number.isRequired,
   lifestyle:  PropTypes.number.isRequired,
   total:      PropTypes.number.isRequired,
-  breakdown:  PropTypes.object.isRequired,
-  comparison: PropTypes.object.isRequired,
+  breakdown:  PropTypes.shape({
+    transport: PropTypes.number.isRequired,
+    home:      PropTypes.number.isRequired,
+    lifestyle: PropTypes.number.isRequired,
+  }).isRequired,
+  comparison: PropTypes.shape({
+    vsGlobal: PropTypes.number.isRequired,
+    vsIndia:  PropTypes.number.isRequired,
+    vsTarget: PropTypes.number.isRequired,
+  }).isRequired,
 }

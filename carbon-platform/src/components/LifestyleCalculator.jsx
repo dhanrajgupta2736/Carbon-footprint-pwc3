@@ -8,11 +8,29 @@ import PropTypes from 'prop-types'
 import { Leaf, Recycle } from 'lucide-react'
 import { DIET_OPTIONS, RECYCLE_OPTIONS } from '../constants/emissions.js'
 
+/** @readonly Impact thresholds for diet emissions meter */
+const DIET_IMPACT_LEVELS = [
+  { max: 1.7,      color: '#16a34a', label: 'Low impact'    },
+  { max: 2.5,      color: '#ca8a04', label: 'Medium impact' },
+  { max: Infinity,  color: '#dc2626', label: 'High impact'   },
+]
+
+/**
+ * Resolve impact level for diet emissions.
+ * @param {number} tons — annual diet emissions
+ * @returns {{ color: string, label: string }}
+ */
+function getDietImpact(tons) {
+  for (const level of DIET_IMPACT_LEVELS) {
+    if (tons <= level.max) return level
+  }
+  return DIET_IMPACT_LEVELS[DIET_IMPACT_LEVELS.length - 1]
+}
+
 function DietMeter({ tons }) {
   const max  = 4.5
   const pct  = Math.min((tons / max) * 100, 100)
-  const color = tons <= 1.7 ? '#16a34a' : tons <= 2.5 ? '#ca8a04' : '#dc2626'
-  const label = tons <= 1.7 ? 'Low impact' : tons <= 2.5 ? 'Medium impact' : 'High impact'
+  const { color, label } = getDietImpact(tons)
 
   return (
     <div className="mt-3 space-y-1" role="img" aria-label={`Diet CO2 impact: ${tons} tonnes per year — ${label}`}>

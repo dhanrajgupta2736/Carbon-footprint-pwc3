@@ -13,6 +13,7 @@ import {
   compareToAverage,
   generateActionPlan,
   generateAssistantInsights,
+  calcProjectedReduction,
 } from '../utils/carbonCalculations.js'
 import { saveState, loadState, clearState } from '../services/storage.js'
 import { trackEvent, trackActionToggled } from '../services/analytics.js'
@@ -35,8 +36,7 @@ function toNum(val, fallback = 0) {
  * @returns {object} Full calculator state + action dispatchers
  */
 export function useCarbonData() {
-  // ── Form state ────────────────────────────────────────────────────────────
-  // ── Form state (lazy initialisation from storage) ─────────────────────────
+  // ── Form state (lazy initialisation from localStorage) ──────────────────
   const [transportData, setTransportData] = useState(() => {
     const saved = loadState()
     return saved ? saved.transport : DEFAULT_TRANSPORT
@@ -109,13 +109,10 @@ export function useCarbonData() {
     { transport: transportEmissions, home: homeEmissions, lifestyle: lifestyleEmissions }
   ), [tNorm, hNorm, lifestyleData, transportEmissions, homeEmissions, lifestyleEmissions])
 
-  // ── Projected CO2 reduction from checked-off actions ─────────────────────
+  // ── Projected CO2 reduction from checked-off actions (dynamic) ────────────
   const projectedReduction = useMemo(() =>
-    Array.from(completedActions).reduce((sum, id) => {
-      const action = allActions.find(a => a.id === id)
-      return sum + (action?.impact ?? 0)
-    }, 0),
-    [completedActions, allActions]
+    calcProjectedReduction(completedActions, allActions, totalEmissions),
+    [completedActions, allActions, totalEmissions]
   )
 
   // ── Assistant messages (memoised) ────────────────────────────────────────
